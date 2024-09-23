@@ -16,8 +16,24 @@ def find_unique_projects(csv):
     return projects
 
 def to_url(project):
-    repo = project.split("_")
-    if len(repo) == 2:
-        return f"https://github.com/apache/{repo[1]}.git"
-    else:
-        return f"https://github.com/apache/{repo[0]}.git"
+    """
+    Parses a project name into a clonable GitHub URL under the Apache organization.
+
+    >>> to_url('test-repository')
+    'https://github.com/apache/test-repository.git'
+
+    Also removes the organization name that is prepended to some of the names:
+    >>> to_url('apache_test-repository')
+    'https://github.com/apache/test-repository.git'
+
+    >>> to_url('apache-test-repository')
+    'https://github.com/apache/test-repository.git'
+    """
+    if project.startswith("apache_") or project.startswith("apache-"):
+        project = project[len("apache_"):]
+
+    return f"https://github.com/apache/{project}.git"
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
