@@ -1,5 +1,43 @@
 import csv
+import subprocess
+import re
+import os
 
+def mine_repo(directory:str):
+    os.chdir(directory) #Change directory to git repository. Remove if not needed
+
+    #Do mining here
+
+    os.chdir("..") #Remove if initial cd wasn't needed
+
+
+def clone_mine_and_delete(url: str):
+    """
+    Clone a repo, mine for refactoring efforts and remove the commit
+    """
+
+    #Clone repo
+    p = subprocess.Popen(
+        ["git", "clone", url],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT
+    )
+
+    try:
+        directory_name = re.search("Cloning into '(.*)'", str(p.stdout.read())).group(1)
+    except IndexError:
+        print("Problem while cloning: " + url)
+
+        return False
+
+    mine_repo(directory_name)
+
+    #Remove repo
+    p = subprocess.Popen(["rm", "-rf", directory_name])
+    p.wait(5)
+
+    return True
+    
 def find_unique_projects(csv):
     projects = set()
     for line in csv:
@@ -20,7 +58,8 @@ def main():
         projects = find_unique_projects(reader)
         print("There are", len(projects), "unique projects")
     for project in projects:
-        print(to_url(project))
+        clone_mine_and_delete(to_url(project))
+        input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed
 
 if __name__ == "__main__":
     main()
