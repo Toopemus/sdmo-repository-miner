@@ -25,7 +25,6 @@ class Repository(object):
         if int(exit_code) != 0:
             raise Exception("Problem while cloning repository from URL: " + url)
 
-
         self.directory_name = re.search("Cloning into '(.*)'", clone_output).group(1)
 
     def __enter__(self):
