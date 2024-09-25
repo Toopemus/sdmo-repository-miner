@@ -1,6 +1,5 @@
 import csv
 import subprocess
-import re
 import os
 from repository import Repository
 
@@ -39,8 +38,11 @@ def main():
         projects = find_unique_projects(reader)
         print("There are", len(projects), "unique projects")
     for project in projects:
-        with Repository(to_url(project)) as dir_name:
-            mine_repo(dir_name)
+        try:
+            with Repository(to_url(project)) as dir_name:
+                mine_repo(dir_name)
+        except Exception as e:
+            print(e)
         input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed
 
 if __name__ == "__main__":
