@@ -1,4 +1,3 @@
-import csv
 import subprocess
 import os
 import urlparser
