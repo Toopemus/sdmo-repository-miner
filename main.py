@@ -1,6 +1,6 @@
-import csv
 import subprocess
 import os
+import urlparser
 from repository import Repository
 
 def mine_repo(directory:str):
@@ -17,29 +17,12 @@ def mine_repo(directory:str):
     print(p.stdout.read())
 
     os.chdir("..") #Remove if initial cd wasn't needed
-    
-def find_unique_projects(csv):
-    projects = set()
-    for line in csv:
-        projects.add(line["project"])
-    return projects
-
-def to_url(project):
-    repo = project.split("_")
-    if len(repo) == 2:
-        return f"https://github.com/apache/{repo[1]}.git"
-    else:
-        return f"https://github.com/apache/{repo[0]}.git"
 
 def main():
-    print('Finding all unique projects...')
-    with open('./sonar_measures.csv', newline='') as repositories:
-        reader = csv.DictReader(repositories)
-        projects = find_unique_projects(reader)
-        print("There are", len(projects), "unique projects")
-    for project in projects:
+    urls = urlparser.list_project_urls("./sonar_measures.csv")
+    for url in urls:
         try:
-            with Repository(to_url(project)) as dir_name:
+            with Repository(url) as dir_name:
                 mine_repo(dir_name)
         except Exception as e:
             print(e)
