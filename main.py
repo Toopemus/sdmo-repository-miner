@@ -2,33 +2,48 @@ import subprocess
 import os
 import urlparser
 import docker
+import tarfile
+import json
 from repository import Repository
 
-def mine_repo(directory:str):
-    '''
-    Get commit hashes here if needed
-    os.chdir(directory) #Change directory to git repository. Remove if not needed
-    p = subprocess.Popen(
-        ["git", "log"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        universal_newlines=True
-    )
-    #print(p.stdout.read())
-    os.chdir("..") #Remove if initial cd wasn't needed
-    '''
+TAR_FILE = "./temp.tar"
+MINER_OUTPUT_FILE = "output.json"
 
-    #Do mining here
+def mine_repo(directory:str):
+    print("mining...")
     client = docker.from_env()
     dir_real_path = os.path.realpath(directory)
-    miner = client.containers.run(
-        "tsantalis/refactoringminer", "-a " + "/repo",
+    miner = client.containers.create("tsantalis/refactoringminer",
+        "-a /repo -json " + MINER_OUTPUT_FILE,
         volumes={
-            os.path.realpath(directory): {"bind": "/repo", "mode": "rw"}
+            dir_real_path: {"bind": "/repo", "mode": "rw"}
         }
     )
+    miner.start()
+    miner.wait()
+    bits, stat = miner.get_archive("diff/" + MINER_OUTPUT_FILE) #Get output file from exited container as a tarfile
+    
+    file = open(TAR_FILE, "wb") #Open file for writing output bits
+    for chunk in bits:
+        file.write(chunk)
+    file.close()
+    
+    output_tar = tarfile.open(TAR_FILE, "r")
+    output_json = output_tar.extractfile(MINER_OUTPUT_FILE).read()
+    json_obj = json.loads(output_json)
 
-    print(miner)
+    #Count different commit types to a directory
+    refactorings = {}
+    for commit in json_obj["commits"]:
+        for refactoring in commit["refactorings"]:
+            type = refactoring["type"]
+            refactorings[type] = refactorings.get(type, 0) + 1
+        
+    print(refactorings)
+    
+    p = subprocess.Popen(["rm", TAR_FILE])
+    p.wait(5)
+
 
 
 def main():
