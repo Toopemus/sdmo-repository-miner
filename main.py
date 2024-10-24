@@ -22,20 +22,21 @@ def mine_repo(directory:str):
     miner.start()
     miner.wait()
     bits, stat = miner.get_archive("diff/" + MINER_OUTPUT_FILE) #Get output file from exited container as a tarfile
-    
+
     file = open(TAR_FILE, "wb") #Open file for writing output bits
     for chunk in bits:
         file.write(chunk)
     file.close()
-    
+
     output_tar = tarfile.open(TAR_FILE, "r") #Extract json object from tarfile
     output_json = output_tar.extractfile(MINER_OUTPUT_FILE).read()
+    output_tar.close()
     json_obj = json.loads(output_json)
 
     #Count different commit types to a directory. Also calculate time between commits average
     refactorings = {}
     previous_refactor_date = None
-    refactor_date_difference_sum = timedelta() 
+    refactor_date_difference_sum = timedelta()
     refactor_count = 0
     for commit in json_obj["commits"]:
         for refactoring in commit["refactorings"]:
@@ -51,7 +52,7 @@ def mine_repo(directory:str):
 
             type = refactoring["type"]
             refactorings[type] = refactorings.get(type, 0) + 1 #Increment count for refactoring type
-        
+
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
         print("Refactor types for " + directory)
         print(refactorings)
