@@ -6,6 +6,7 @@ import tarfile
 import json
 from datetime import datetime, timedelta
 from repository import Repository
+from pydriller import Repository as PyDriller
 
 TAR_FILE = "./temp.tar"
 MINER_OUTPUT_FILE = "output.json"
@@ -38,9 +39,11 @@ def mine_repo(directory:str):
     previous_refactor_date = None
     refactor_date_difference_sum = timedelta()
     refactor_count = 0
+    refactoring_hashes = []
     for commit in json_obj["commits"]:
         for refactoring in commit["refactorings"]:
             commit_hash = commit["sha1"]
+            refactoring_hashes.append(commit_hash)
 
             commit_date = get_commit_date(directory, commit_hash)
             if (previous_refactor_date):
@@ -53,6 +56,9 @@ def mine_repo(directory:str):
             type = refactoring["type"]
             refactorings[type] = refactorings.get(type, 0) + 1 #Increment count for refactoring type
 
+    # TODO: save to file
+    diffs = collect_diffs(dir_real_path, refactoring_hashes)
+
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
         print("Refactor types for " + directory)
         print(refactorings)
@@ -62,6 +68,23 @@ def mine_repo(directory:str):
 
     p = subprocess.Popen(["rm", TAR_FILE]) #Remove tarfile
     p.wait(5)
+
+def collect_diffs(path, hashes):
+    print("Calculating diffs...")
+
+    out = []
+    for commit in PyDriller(path, only_commits=hashes).traverse_commits():
+        diff_output = {}
+        for file in commit.modified_files:
+            diff_output["sha1"] = commit.hash
+            diff_output["added"] = file.added_lines
+            diff_output["deleted"] = file.deleted_lines
+            diff_output["diff"] = file.diff
+        out.append(diff_output)
+
+    print("Diffs collected.")
+
+    return out
 
 def get_commit_date(git_dir:str, hash:str) -> datetime:
     """
