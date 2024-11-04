@@ -8,6 +8,7 @@ import csv
 from datetime import datetime, timedelta
 from repository import Repository
 from pydriller import Repository as PyDriller
+from pydriller import Git, Commit
 
 
 TAR_FILE = "./temp.tar"
@@ -28,15 +29,13 @@ def is_programing_language(extension: str) -> bool:
     return language_map.get(extension) in TIOBE_LANGUAGES
 
 #GET LINES OF CODE
-def get_loc(directory: str) -> int:
+def get_loc(commit: Commit) -> int:
     loc = 0
-    for root, _, files in os.walk(directory):
-        for filename in files:
-            _, ext = os.path.splitext(filename)
-            if is_programing_language(ext):
-                file_path = os.path.join(root, filename)
-                with open(file_path, 'r', errors='ignore') as f:
-                    loc += sum(1 for line in f if line.strip())
+    for file in commit.modified_files:
+        _, ext = os.path.splitext(file.filename)
+        if not is_programing_language(ext):
+            continue
+        loc += file.nloc
     return loc
 
 #GET HASHES
@@ -46,34 +45,29 @@ def get_hashes(repo_path: str):
     return result.stdout.splitlines()
 
 #ANALYSE THE REPOSITORY
-def analyze_repo(repo_path: str, output_csv: str):
+def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes: list[str]):
     with open(output_csv, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["refactoring hash", "previous hash", "TLOC"])
 
-        commit_hashes = get_hashes(repo_path)
-
-        previous_commit_hash = None
-        previous_loc = None
+        gr = Git(repo_path)
 
         #traversing each commit hash and calculate
-        for commit_hash in commit_hashes:
+        for commit_hash in refactoring_hashes:
             
-            subprocess.run(["git", "-C", repo_path, "checkout", commit_hash], check = True)
 
-            loc_current = get_loc(repo_path)
+            commit = gr.get_commit(commit_hash)
+            previous_commit_hash = commit.parents[0]
+            previous_commit = gr.get_commit(previous_commit_hash)
+            loc_current = get_loc(commit)
+            loc_previous = get_loc(previous_commit)
 
-            if previous_commit_hash and previous_loc is not None:
-                tloc = abs(loc_current - previous_loc)
-                #write changes to CSV
-                writer.writerow([commit_hash, previous_commit_hash, tloc])
-                print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
+            tloc = abs(loc_current - loc_previous)
+            #write changes to CSV
+            writer.writerow([commit_hash, previous_commit_hash, tloc])
+            print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
 
-                previous_commit_hash = commit_hash
-                previous_loc = loc_current
-
-        subprocess.run(["git", "-C", repo_path, "checkout", "main"], check = True)
-
+       
 def mine_repo(directory:str):
     print("1")
     client = docker.from_env()
@@ -128,6 +122,8 @@ def mine_repo(directory:str):
     # TODO: save to file
     diffs = collect_diffs(dir_real_path, refactoring_hashes)
 
+    collect_developer_effort(directory, "developer_effort.csv", refactoring_hashes)
+
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
         print("Refactor types for " + directory)
         print(refactorings)
@@ -176,8 +172,9 @@ def main():
     for url in urls:
         try:
            with Repository(url) as dir_name:
-                #dir_name = mine_repo(url)
-                analyze_repo(mine_repo(dir_name), output_csv)
+            
+                mine_repo(dir_name)
+                
         except Exception as e:
             print(e)
         input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed
