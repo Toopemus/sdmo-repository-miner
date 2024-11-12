@@ -65,12 +65,12 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
 
                 if os.path.getsize(output_file_path) == 0:
                     writer.writerow(["refactoring hash", "previous hash", "TLOC"])
-            
+
                 #for commit_hash in refactoring_hashes:
                 if commit_hash not in processed_hashes:
                    # continue
                     processed_hashes.add(commit_hash)
-            
+
                     if not commit.parents:
                         print(f"Skipping commit {commit_hash} (no parents found)")
                         continue
@@ -83,9 +83,8 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
 
                     writer.writerow([commit_hash, previous_commit_hash, tloc])
                     print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
-            
 
-       
+
 def mine_repo(directory:str):
     client = docker.from_env()
     dir_real_path = os.path.realpath(directory)
@@ -143,9 +142,8 @@ def mine_repo(directory:str):
         print("Average time between refactors:", refactor_date_difference_sum / refactor_count)
     else:
         print("No refactorings for repository " + os.path.basename(directory))
-        
-    p = subprocess.Popen(["rm", TAR_FILE]) # Remove tarfile
-    p.wait(5)
+
+    os.remove(TAR_FILE)
 
 
 def collect_diffs(path, hashes):
