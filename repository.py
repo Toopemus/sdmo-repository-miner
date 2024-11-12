@@ -1,6 +1,7 @@
 import subprocess
 import shutil
 import os
+import stat
 import re
 
 class Repository(object):
@@ -37,5 +38,9 @@ class Repository(object):
         return (self.directory_name, self.repo_name)
 
     def __exit__(self, type, value, traceback):
-        shutil.rmtree(self.directory_name)
+        def remove_readonly(func, path, _):
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+
+        shutil.rmtree(self.directory_name, onexc=remove_readonly)
 
