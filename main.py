@@ -4,14 +4,88 @@ import urlparser
 import docker
 import tarfile
 import json
+import csv
 import issues
+
 from datetime import datetime, timedelta
 from repository import Repository
 from pydriller import Repository as PyDriller
+from pydriller import Git, Commit
+
 
 TAR_FILE = "./temp.tar"
 MINER_OUTPUT_FILE = "output.json"
+TIOBE_LANGUAGES = [
+    "Python", "Java", "C", "C++", "C#", "JavaScript", "PHP", "Ruby", "Go",
+    "TypeScript", "Swift", "Kotlin", "Rust", "Scala", "Dart", "R", "Objective-C"
+]
 
+#CHECK PROGRAMMING LANGUAGE
+def is_programing_language(extension: str) -> bool:
+    language_map = {
+        ".py": "Python", ".java": "Java", ".c": "C", ".cpp": "C++", ".cs": "C#",
+        ".js": "JavaScript", ".php": "PHP", ".rb": "Ruby", ".go": "Go",
+        ".ts": "TypeScript", ".swift": "Swift", ".kt": "Kotlin", ".rs": "Rust",
+        ".scala": "Scala", ".dart": "Dart", ".r": "R", ".m": "Objective-C"
+    }
+    return language_map.get(extension) in TIOBE_LANGUAGES
+
+#GET LINES OF CODE
+def get_loc(commit: Commit) -> int:
+    loc = 0
+    for file in commit.modified_files:
+        _, ext = os.path.splitext(file.filename)
+        if not is_programing_language(ext):
+            continue
+        loc += file.nloc if file.nloc is not None else 0
+    return loc
+
+#GET HASHES
+def get_hashes(repo_path: str):
+    command = ["git", "-C", repo_path, "rev-list", "--all"]
+    result = subprocess.run(command, stdout = subprocess.PIPE, text = True)
+    return result.stdout.splitlines()
+
+#ANALYSE THE REPOSITORY
+def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes: list[str]):
+    refactoring_hashes = list(set(refactoring_hashes))  # Remove duplicates
+
+    gr = Git(repo_path)
+    processed_hashes = set()
+
+    for commit_hash in refactoring_hashes:
+            commit = gr.get_commit(commit_hash)
+            developer_name = commit.author.name.replace(" ", "_") if commit.author else "Unknown"
+
+            developer_file_name = f"{developer_name}_developer_effort.csv"
+            output_file_path = os.path.join(os.path.dirname(output_csv), developer_file_name)
+
+            with open(output_file_path, "a", newline="") as csvfile:
+                writer = csv.writer(csvfile)
+
+                if os.path.getsize(output_file_path) == 0:
+                    writer.writerow(["refactoring hash", "previous hash", "TLOC"])
+            
+                #for commit_hash in refactoring_hashes:
+                if commit_hash not in processed_hashes:
+                   # continue
+                    processed_hashes.add(commit_hash)
+            
+                    if not commit.parents:
+                        print(f"Skipping commit {commit_hash} (no parents found)")
+                        continue
+                    previous_commit_hash = commit.parents[0]
+                    previous_commit = gr.get_commit(previous_commit_hash)
+
+                    loc_current = get_loc(commit)
+                    loc_previous = get_loc(previous_commit)
+                    tloc = abs(loc_current - loc_previous)
+
+                    writer.writerow([commit_hash, previous_commit_hash, tloc])
+                    print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
+            
+
+       
 def mine_repo(directory:str):
     client = docker.from_env()
     dir_real_path = os.path.realpath(directory)
@@ -61,14 +135,15 @@ def mine_repo(directory:str):
     # TODO: save to file
     diffs = collect_diffs(dir_real_path, refactoring_hashes)
 
+    collect_developer_effort(directory, "developer_effort.csv", refactoring_hashes)
+
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
         print("Refactor types for " + directory)
         print(refactorings)
         print("Average time between refactors:", refactor_date_difference_sum / refactor_count)
     else:
         print("No refactorings for repository " + directory)
-
-
+        
     p = subprocess.Popen(["rm", TAR_FILE]) # Remove tarfile
     p.wait(5)
 
@@ -104,9 +179,11 @@ def get_commit_date(git_dir: str, hash: str) -> datetime:
 
 def main():
     urls = urlparser.list_project_urls("./sonar_measures.csv")
+    output_csv = "developer_effort.csv"
+
     for url in urls:
         try:
-            with Repository(url) as dir_name:
+           with Repository(url) as dir_name:
                 mine_repo(dir_name)
                 issues.mine_issue_data(url)
         except Exception as e:
