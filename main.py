@@ -138,11 +138,11 @@ def mine_repo(directory:str):
     collect_developer_effort(directory, "developer_effort.csv", refactoring_hashes)
 
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
-        print("Refactor types for " + directory)
+        print("Refactor types for " + os.path.basename(directory))
         print(refactorings)
         print("Average time between refactors:", refactor_date_difference_sum / refactor_count)
     else:
-        print("No refactorings for repository " + directory)
+        print("No refactorings for repository " + os.path.basename(directory))
         
     p = subprocess.Popen(["rm", TAR_FILE]) # Remove tarfile
     p.wait(5)

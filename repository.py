@@ -1,4 +1,6 @@
 import subprocess
+import shutil
+import os
 import re
 
 class Repository(object):
@@ -25,13 +27,14 @@ class Repository(object):
         if int(exit_code) != 0:
             raise Exception("Problem while cloning repository from URL: " + url)
 
-        self.directory_name = re.search("Cloning into '(.*)'", clone_output).group(1)
+        repo_name = re.search("Cloning into '(.*)'", clone_output).group(1)
+        current_dir = os.path.dirname(__file__)
+
+        self.directory_name = os.path.join(current_dir, repo_name)
 
     def __enter__(self):
         return self.directory_name
-    
-    def __exit__(self, type, value, traceback):
-        p = subprocess.Popen(["rm", "-rf", self.directory_name])
-        p.wait(5)
 
+    def __exit__(self, type, value, traceback):
+        shutil.rmtree(self.directory_name)
 
