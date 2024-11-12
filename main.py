@@ -122,7 +122,6 @@ def mine_repo(directory:str):
             commit_hash = commit["sha1"]
             refactoring_hashes.append(commit_hash)
         for refactoring in commit["refactorings"]:
-
             commit_date = get_commit_date(directory, commit_hash)
             if previous_refactor_date:
                 #First commit in list is the latest commit, do substraction accordingly
