@@ -4,15 +4,24 @@ import json
 GITHUB_API_URL = "https://api.github.com/repos/"
 APACHE_JIRA_API_URL = "https://issues.apache.org/jira/rest/api/2"
 
+
+def read_token():
+    with open(".env", "r") as token_file:
+        return token_file.read()
+
+token = read_token()
+headers = {
+    'Authorization': f'token {token}'
+}
+    
 def check_github_issues(owner, repo):
-    response = requests.get(f"{GITHUB_API_URL}{owner}/{repo}")
+    response = requests.get(f"{GITHUB_API_URL}{owner}/{repo}", headers = headers)
     return response.status_code == 200
 
 # Get issues from GitHub
 def fetch_github_issues(owner, repo): 
     """
     Gets the github issues from repository.
-
     >>> issues = fetch_github_issues('apache', 'incubator-iotdb')
     >>> len(issues) != 0
     True
@@ -21,7 +30,7 @@ def fetch_github_issues(owner, repo):
     issues = []
     page = 1
     while True:
-        response = requests.get(f"{GITHUB_API_URL}{owner}/{repo}/issues?page={page}")
+        response = requests.get(f"{GITHUB_API_URL}{owner}/{repo}/issues?page={page}", headers = headers)
         if response.status_code != 200:
             print(f"Failed to fetch issues from GitHub: {response.status_code}")
             break
