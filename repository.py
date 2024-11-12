@@ -42,5 +42,5 @@ class Repository(object):
             os.chmod(path, stat.S_IWRITE)
             func(path)
 
-        shutil.rmtree(self.directory_name, onerror=remove_readonly)
+        shutil.rmtree(self.directory_name, onexc=remove_readonly)
 
