@@ -140,6 +140,9 @@ def mine_repo(repo_dir:str, output_dir:str):
     # TODO: save to file
     diffs = collect_diffs(dir_real_path, refactoring_hashes)
 
+    with open(os.path.join(output_dir, "diffs.json"), "w") as diffs_file:
+        json.dump(diffs, diffs_file)
+
     collect_developer_effort(repo_dir, "developer_effort.csv", refactoring_hashes)
 
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
