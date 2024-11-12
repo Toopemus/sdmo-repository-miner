@@ -18,7 +18,9 @@ pip install -r requirements.txt
 docker pull tsantalis/refactoringminer
 ```
 
-4. Run the script:
+4. create .env file and input your github token there
+
+5. Run the script:
 
 ```bash
 python main.py
