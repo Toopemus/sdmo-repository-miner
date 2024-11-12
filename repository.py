@@ -30,10 +30,11 @@ class Repository(object):
         repo_name = re.search("Cloning into '(.*)'", clone_output).group(1)
         current_dir = os.path.dirname(__file__)
 
+        self.repo_name = repo_name
         self.directory_name = os.path.join(current_dir, repo_name)
 
     def __enter__(self):
-        return self.directory_name
+        return (self.directory_name, self.repo_name)
 
     def __exit__(self, type, value, traceback):
         shutil.rmtree(self.directory_name)

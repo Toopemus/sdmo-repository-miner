@@ -85,9 +85,9 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
                     print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
 
 
-def mine_repo(directory:str):
+def mine_repo(repo_dir:str, output_dir:str):
     client = docker.from_env()
-    dir_real_path = os.path.realpath(directory)
+    dir_real_path = os.path.realpath(repo_dir)
     miner = client.containers.create("tsantalis/refactoringminer",
         "-a /repo -json " + MINER_OUTPUT_FILE,
         volumes={
@@ -121,7 +121,7 @@ def mine_repo(directory:str):
             commit_hash = commit["sha1"]
             refactoring_hashes.append(commit_hash)
 
-            commit_date = get_commit_date(directory, commit_hash)
+            commit_date = get_commit_date(repo_dir, commit_hash)
             if previous_refactor_date:
                 #First commit in list is the latest commit, do substraction accordingly
                 refactor_date_difference_sum += previous_refactor_date - commit_date
@@ -131,17 +131,23 @@ def mine_repo(directory:str):
             type = refactoring["type"]
             refactorings[type] = refactorings.get(type, 0) + 1 #Increment count for refactoring type
 
+    with open(os.path.join(output_dir, "rminer-output.json"), "w") as rminer_file:
+        json.dump(json_obj, rminer_file)
+
+    with open(os.path.join(output_dir, "refactorings.json"), "w") as refactorings_file:
+        json.dump(refactorings, refactorings_file)
+
     # TODO: save to file
     diffs = collect_diffs(dir_real_path, refactoring_hashes)
 
-    collect_developer_effort(directory, "developer_effort.csv", refactoring_hashes)
+    collect_developer_effort(repo_dir, "developer_effort.csv", refactoring_hashes)
 
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
-        print("Refactor types for " + os.path.basename(directory))
+        print("Refactor types for " + os.path.basename(repo_dir))
         print(refactorings)
         print("Average time between refactors:", refactor_date_difference_sum / refactor_count)
     else:
-        print("No refactorings for repository " + os.path.basename(directory))
+        print("No refactorings for repository " + os.path.basename(repo_dir))
 
     os.remove(TAR_FILE)
 
@@ -181,8 +187,14 @@ def main():
 
     for url in urls:
         try:
-           with Repository(url) as dir_name:
-                mine_repo(dir_name)
+           with Repository(url) as (dir_name, repo_name):
+                current_dir = os.path.dirname(__file__)
+                output_dir = os.path.join(current_dir, "output", repo_name)
+
+                print(f"OUTPUT DIRECTORY: {output_dir}")
+                os.makedirs(output_dir)
+
+                mine_repo(dir_name, output_dir)
                 issues.mine_issue_data(url)
         except Exception as e:
             print(e)
