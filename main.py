@@ -35,7 +35,7 @@ def get_loc(commit: Commit) -> int:
         _, ext = os.path.splitext(file.filename)
         if not is_programing_language(ext):
             continue
-        loc += file.nloc
+        loc += file.nloc if file.nloc is not None else 0
     return loc
 
 #GET HASHES
@@ -46,26 +46,42 @@ def get_hashes(repo_path: str):
 
 #ANALYSE THE REPOSITORY
 def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes: list[str]):
-    with open(output_csv, "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["refactoring hash", "previous hash", "TLOC"])
+    refactoring_hashes = list(set(refactoring_hashes))  # Remove duplicates
 
-        gr = Git(repo_path)
+    gr = Git(repo_path)
+    processed_hashes = set()
 
-        #traversing each commit hash and calculate
-        for commit_hash in refactoring_hashes:
-            
-
+    for commit_hash in refactoring_hashes:
             commit = gr.get_commit(commit_hash)
-            previous_commit_hash = commit.parents[0]
-            previous_commit = gr.get_commit(previous_commit_hash)
-            loc_current = get_loc(commit)
-            loc_previous = get_loc(previous_commit)
+            developer_name = commit.author.name.replace(" ", "_") if commit.author else "Unknown"
 
-            tloc = abs(loc_current - loc_previous)
-            #write changes to CSV
-            writer.writerow([commit_hash, previous_commit_hash, tloc])
-            print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
+            developer_file_name = f"{developer_name}_developer_effort.csv"
+            output_file_path = os.path.join(os.path.dirname(output_csv), developer_file_name)
+
+            with open(output_file_path, "a", newline="") as csvfile:
+                writer = csv.writer(csvfile)
+
+                if os.path.getsize(output_file_path) == 0:
+                    writer.writerow(["refactoring hash", "previous hash", "TLOC"])
+            
+                #for commit_hash in refactoring_hashes:
+                if commit_hash not in processed_hashes:
+                   # continue
+                    processed_hashes.add(commit_hash)
+            
+                    if not commit.parents:
+                        print(f"Skipping commit {commit_hash} (no parents found)")
+                        continue
+                    previous_commit_hash = commit.parents[0]
+                    previous_commit = gr.get_commit(previous_commit_hash)
+
+                    loc_current = get_loc(commit)
+                    loc_previous = get_loc(previous_commit)
+                    tloc = abs(loc_current - loc_previous)
+
+                    writer.writerow([commit_hash, previous_commit_hash, tloc])
+                    print("TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
+            
 
        
 def mine_repo(directory:str):
@@ -168,13 +184,14 @@ def get_commit_date(git_dir:str, hash:str) -> datetime:
 
 def main():
     urls = urlparser.list_project_urls("./sonar_measures.csv")
+    #output_csv = "output.csv"
+    #output_csv = "./output"
     output_csv = "developer_effort.csv"
+
     for url in urls:
         try:
            with Repository(url) as dir_name:
-            
                 mine_repo(dir_name)
-                
         except Exception as e:
             print(e)
         input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed
