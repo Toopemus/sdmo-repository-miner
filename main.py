@@ -85,11 +85,8 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
 
        
 def mine_repo(directory:str):
-    print("1")
     client = docker.from_env()
-    print("2")
     dir_real_path = os.path.realpath(directory)
-    print("3")
     miner = client.containers.create("tsantalis/refactoringminer",
         "-a /repo -json " + MINER_OUTPUT_FILE,
         volumes={
@@ -97,15 +94,12 @@ def mine_repo(directory:str):
         }
     )
     miner.start()
-    print("4")
     miner.wait()
     bits, stat = miner.get_archive("diff/" + MINER_OUTPUT_FILE) #Get output file from exited container as a tarfile
 
     file = open(TAR_FILE, "wb") #Open file for writing output bits
-    print("5")
     for chunk in bits:
         file.write(chunk)
-    print("6")
     file.close()
 
     output_tar = tarfile.open(TAR_FILE, "r") #Extract json object from tarfile
@@ -148,8 +142,7 @@ def mine_repo(directory:str):
         print("No refactorings for repository " + directory)
 
     p = subprocess.Popen(["rm", TAR_FILE]) #Remove tarfile
-    #print(TAR_FILE)
-    #p = os.remove(TAR_FILE)
+    p = os.remove(TAR_FILE)
     p.wait(5)
 
 def collect_diffs(path, hashes):
@@ -184,8 +177,6 @@ def get_commit_date(git_dir:str, hash:str) -> datetime:
 
 def main():
     urls = urlparser.list_project_urls("./sonar_measures.csv")
-    #output_csv = "output.csv"
-    #output_csv = "./output"
     output_csv = "developer_effort.csv"
 
     for url in urls:
