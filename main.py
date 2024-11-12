@@ -198,7 +198,7 @@ def main():
                 os.makedirs(output_dir)
 
                 mine_repo(dir_name, output_dir)
-                issues.mine_issue_data(url)
+                issues.mine_issue_data(url, output_dir)
         except Exception as e:
             print(e)
         input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed
