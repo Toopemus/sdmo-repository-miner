@@ -93,7 +93,7 @@ def mine_issue_data(url):
         issues = fetch_github_issues(owner, repo)
         print(f"Retrieved {len(issues)} issues for GitHub repo {owner}/{repo}")
         with open(f"{repo}_github_issues.json", "w") as issue_file:
-            json.dump(issues, issue_file, indent=4)
+            json.dump(issues, issue_file)
     elif find_jira_project_key(url,jira_projects):
         # JIRA project processing
         project_key = find_jira_project_key(url, jira_projects)
@@ -101,7 +101,7 @@ def mine_issue_data(url):
             issues = fetch_jira_data(project_key=project_key).get("issues", [])
             print(f"Retrieved {len(issues)} issues for JIRA project {project_key}")
             with open(f"{project_key}_jira_issues.json", "w") as issue_file:
-                json.dump(issues, issue_file, indent=4)
+                json.dump(issues, issue_file)
         else:
             print(f"No JIRA project found for URL: {url}")
     else:
