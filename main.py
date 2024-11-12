@@ -80,7 +80,7 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
                     tloc = abs(loc_current - loc_previous)
 
                     writer.writerow([commit_hash, previous_commit_hash, tloc])
-                    print("TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
+                    print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
             
 
        
@@ -142,7 +142,7 @@ def mine_repo(directory:str):
         print("No refactorings for repository " + directory)
 
     p = subprocess.Popen(["rm", TAR_FILE]) #Remove tarfile
-    p = os.remove(TAR_FILE)
+
     p.wait(5)
 
 def collect_diffs(path, hashes):
