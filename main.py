@@ -118,9 +118,10 @@ def mine_repo(directory:str):
     refactoring_hashes = []
 
     for commit in json_obj["commits"]:
-        for refactoring in commit["refactorings"]:
+        if len(commit["refactorings"]) > 0:
             commit_hash = commit["sha1"]
             refactoring_hashes.append(commit_hash)
+        for refactoring in commit["refactorings"]:
 
             commit_date = get_commit_date(directory, commit_hash)
             if previous_refactor_date:
