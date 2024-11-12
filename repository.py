@@ -38,9 +38,9 @@ class Repository(object):
         return (self.directory_name, self.repo_name)
 
     def __exit__(self, type, value, traceback):
-        def remove_readonly(func, path, _):
+        def remove_manually(func, path, _):
             os.chmod(path, stat.S_IWRITE)
-            func(path)
+            os.remove(path)
 
-        shutil.rmtree(self.directory_name, onexc=remove_readonly)
+        shutil.rmtree(self.directory_name, onexc=remove_manually)
 
