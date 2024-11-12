@@ -11,7 +11,7 @@ def read_token():
 
 token = read_token()
 headers = {
-    'Authorization': f'token {token}'
+    'Authorization': f'token {token.strip()}'
 }
     
 def check_github_issues(owner, repo):
