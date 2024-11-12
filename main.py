@@ -68,7 +68,7 @@ def collect_developer_effort(repo_path: str, output_dir: str, refactoring_hashes
 
                 #for commit_hash in refactoring_hashes:
                 if commit_hash not in processed_hashes:
-                   # continue
+                    # continue
                     processed_hashes.add(commit_hash)
 
                     if not commit.parents:
@@ -186,7 +186,6 @@ def get_commit_date(git_dir: str, hash: str) -> datetime:
 
 def main():
     urls = urlparser.list_project_urls("./sonar_measures.csv")
-    output_csv = "developer_effort.csv"
 
     for url in urls:
         try:
