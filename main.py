@@ -47,7 +47,7 @@ def get_hashes(repo_path: str):
     return result.stdout.splitlines()
 
 #ANALYSE THE REPOSITORY
-def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes: list[str]):
+def collect_developer_effort(repo_path: str, output_dir: str, refactoring_hashes: list[str]):
     refactoring_hashes = list(set(refactoring_hashes))  # Remove duplicates
 
     gr = Git(repo_path)
@@ -58,7 +58,7 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
             developer_name = commit.author.name.replace(" ", "_") if commit.author else "Unknown"
 
             developer_file_name = f"{developer_name}_developer_effort.csv"
-            output_file_path = os.path.join(os.path.dirname(output_csv), developer_file_name)
+            output_file_path = os.path.join(output_dir, developer_file_name)
 
             with open(output_file_path, "a", newline="") as csvfile:
                 writer = csv.writer(csvfile)
@@ -143,7 +143,7 @@ def mine_repo(repo_dir:str, output_dir:str):
     with open(os.path.join(output_dir, "diffs.json"), "w") as diffs_file:
         json.dump(diffs, diffs_file)
 
-    collect_developer_effort(repo_dir, "developer_effort.csv", refactoring_hashes)
+    collect_developer_effort(repo_dir, output_dir, refactoring_hashes)
 
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
         print("Refactor types for " + os.path.basename(repo_dir))
