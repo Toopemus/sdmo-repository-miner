@@ -12,13 +12,14 @@ from repository import Repository
 from pydriller import Repository as PyDriller
 from pydriller import Git, Commit
 
-
 TAR_FILE = "./temp.tar"
 MINER_OUTPUT_FILE = "output.json"
 TIOBE_LANGUAGES = [
     "Python", "Java", "C", "C++", "C#", "JavaScript", "PHP", "Ruby", "Go",
     "TypeScript", "Swift", "Kotlin", "Rust", "Scala", "Dart", "R", "Objective-C"
 ]
+
+def current_time(): return "{:%H:%M:%S}".format(datetime.now().time())
 
 #CHECK PROGRAMMING LANGUAGE
 def is_programing_language(extension: str) -> bool:
@@ -82,10 +83,9 @@ def collect_developer_effort(repo_path: str, output_dir: str, refactoring_hashes
                     tloc = abs(loc_current - loc_previous)
 
                     writer.writerow([commit_hash, previous_commit_hash, tloc])
-                    print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
-
 
 def mine_repo(repo_dir:str, output_dir:str):
+    print(f"{current_time()} - Running RefactoringMiner...")
     client = docker.from_env()
     dir_real_path = os.path.realpath(repo_dir)
     miner = client.containers.create("tsantalis/refactoringminer",
@@ -97,7 +97,6 @@ def mine_repo(repo_dir:str, output_dir:str):
     miner.start()
     miner.wait()
     bits, stat = miner.get_archive("diff/" + MINER_OUTPUT_FILE) # Get output file from exited container as a tarfile
-
 
     file = open(TAR_FILE, "wb") #Open file for writing output bits
     for chunk in bits:
@@ -112,6 +111,7 @@ def mine_repo(repo_dir:str, output_dir:str):
     with open(os.path.join(output_dir, "rminer-output.json"), "w") as rminer_file:
         json.dump(json_obj, rminer_file)
 
+    print(f"{current_time()} - Parsing output from RefactoringMiner...")
     #Count different commit types to a directory. Also calculate time between commits average
     refactorings = {}
     previous_refactor_date = None
@@ -146,17 +146,17 @@ def mine_repo(repo_dir:str, output_dir:str):
         }
         json.dump(output, refactorings_file)
 
+    print(f"{current_time()} - Collecting diffs...")
     diffs = collect_diffs(dir_real_path, refactoring_hashes)
     with open(os.path.join(output_dir, "diffs.json"), "w") as diffs_file:
         json.dump(diffs, diffs_file)
 
+    print(f"{current_time()} - Collecting developer effort...")
     collect_developer_effort(repo_dir, output_dir, refactoring_hashes)
 
     os.remove(TAR_FILE)
 
-
 def collect_diffs(path, hashes):
-    print("Calculating diffs...")
     out = []
     for commit in PyDriller(path, only_commits=hashes).traverse_commits():
         diff_output = {
@@ -171,9 +171,7 @@ def collect_diffs(path, hashes):
                 "diff": file.diff
             })
         out.append(diff_output)
-    print("Diffs collected.")
     return out
-
 
 def get_commit_date(git_dir: str, hash: str) -> datetime:
     """
@@ -187,7 +185,6 @@ def get_commit_date(git_dir: str, hash: str) -> datetime:
     )
     return datetime.strptime(p.stdout.read().strip(), "%Y-%m-%d %H:%M:%S %z")
 
-
 def main():
     urls = urlparser.list_project_urls("./sonar_measures.csv")
 
@@ -197,11 +194,17 @@ def main():
                 current_dir = os.path.dirname(__file__)
                 output_dir = os.path.join(current_dir, "output", repo_name)
 
-                print(f"OUTPUT DIRECTORY: {output_dir}")
+                # If the directory exists (i.e. we have already mined it) we
+                # just catch an error and move to the next repository.
                 os.makedirs(output_dir)
 
+                print(f"Mining the {repo_name} repository...")
                 mine_repo(dir_name, output_dir)
+
+                print(f"{current_time()} - Mining issue data...")
                 issues.mine_issue_data(url, output_dir)
+
+                print(f"{current_time()} - Success!\n")
         except Exception as e:
             print(e)
         input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed

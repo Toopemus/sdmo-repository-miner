@@ -5,7 +5,7 @@ def list_project_urls(filename):
     with open(filename, newline='') as repositories:
         reader = csv.DictReader(repositories)
         projects = find_unique_projects(reader)
-        print("There are", len(projects), "unique projects.")
+        print("There are", len(projects), "unique projects.\n")
         urls = map(to_url, projects)
         return urls
 
