@@ -159,9 +159,13 @@ def collect_diffs(path, hashes):
     print("Calculating diffs...")
     out = []
     for commit in PyDriller(path, only_commits=hashes).traverse_commits():
-        diff_output = {"sha1": commit.hash}
+        diff_output = {
+            "commit_hash": commit.hash,
+            "diffs": []
+        }
         for file in commit.modified_files:
-            diff_output.update({
+            diff_output["diffs"].append({
+                "file": file.new_path,
                 "added": file.added_lines,
                 "deleted": file.deleted_lines,
                 "diff": file.diff
