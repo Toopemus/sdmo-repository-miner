@@ -209,7 +209,6 @@ def main():
                 print(f"{current_time()} - Success!\n")
         except Exception as e:
             print(e)
-        input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed
 
 if __name__ == "__main__":
     main()
