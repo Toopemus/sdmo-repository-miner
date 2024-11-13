@@ -109,6 +109,9 @@ def mine_repo(repo_dir:str, output_dir:str):
     output_tar.close()
     json_obj = json.loads(output_json)
 
+    with open(os.path.join(output_dir, "rminer-output.json"), "w") as rminer_file:
+        json.dump(json_obj, rminer_file)
+
     #Count different commit types to a directory. Also calculate time between commits average
     refactorings = {}
     previous_refactor_date = None
@@ -132,26 +135,22 @@ def mine_repo(repo_dir:str, output_dir:str):
             type = refactoring["type"]
             refactorings[type] = refactorings.get(type, 0) + 1 #Increment count for refactoring type
 
-    with open(os.path.join(output_dir, "rminer-output.json"), "w") as rminer_file:
-        json.dump(json_obj, rminer_file)
+    time_between_refactors = 0
+    if len(refactorings) > 0: #Print output for now, get prettier output in the future
+        time_between_refactors = refactor_date_difference_sum / refactor_count
 
     with open(os.path.join(output_dir, "refactorings.json"), "w") as refactorings_file:
-        json.dump(refactorings, refactorings_file)
+        output = {
+            "refactorings": refactorings,
+            "average_time_between_refactors": str(time_between_refactors)
+        }
+        json.dump(output, refactorings_file)
 
-    # TODO: save to file
     diffs = collect_diffs(dir_real_path, refactoring_hashes)
-
     with open(os.path.join(output_dir, "diffs.json"), "w") as diffs_file:
         json.dump(diffs, diffs_file)
 
     collect_developer_effort(repo_dir, output_dir, refactoring_hashes)
-
-    if len(refactorings) > 0: #Print output for now, get prettier output in the future
-        print("Refactor types for " + os.path.basename(repo_dir))
-        print(refactorings)
-        print("Average time between refactors:", refactor_date_difference_sum / refactor_count)
-    else:
-        print("No refactorings for repository " + os.path.basename(repo_dir))
 
     os.remove(TAR_FILE)
 
