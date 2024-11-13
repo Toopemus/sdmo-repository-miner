@@ -1,3 +1,4 @@
+import os
 import requests
 import json
 
@@ -83,7 +84,7 @@ def parse_github_repo(url):
     parts = url.split('/')
     return parts[-2], parts[-1]
 
-def mine_issue_data(url):
+def mine_issue_data(url, output_dir):
 
     jira_projects = fetch_jira_data()  # Fetch all JIRA projects from Apache JIRA
 
@@ -92,7 +93,7 @@ def mine_issue_data(url):
     if check_github_issues(owner, repo):
         issues = fetch_github_issues(owner, repo)
         print(f"Retrieved {len(issues)} issues for GitHub repo {owner}/{repo}")
-        with open(f"{repo}_github_issues.json", "w") as issue_file:
+        with open(os.path.join(output_dir, f"{repo}_github_issues.json"), "w") as issue_file:
             json.dump(issues, issue_file)
     elif find_jira_project_key(url,jira_projects):
         # JIRA project processing
@@ -100,7 +101,7 @@ def mine_issue_data(url):
         if project_key:
             issues = fetch_jira_data(project_key=project_key).get("issues", [])
             print(f"Retrieved {len(issues)} issues for JIRA project {project_key}")
-            with open(f"{project_key}_jira_issues.json", "w") as issue_file:
+            with open(os.path.join(output_dir, f"{project_key}_jira_issues.json"), "w") as issue_file:
                 json.dump(issues, issue_file)
         else:
             print(f"No JIRA project found for URL: {url}")

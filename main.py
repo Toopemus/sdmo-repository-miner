@@ -47,7 +47,7 @@ def get_hashes(repo_path: str):
     return result.stdout.splitlines()
 
 #ANALYSE THE REPOSITORY
-def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes: list[str]):
+def collect_developer_effort(repo_path: str, output_dir: str, refactoring_hashes: list[str]):
     refactoring_hashes = list(set(refactoring_hashes))  # Remove duplicates
 
     gr = Git(repo_path)
@@ -58,19 +58,19 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
             developer_name = commit.author.name.replace(" ", "_") if commit.author else "Unknown"
 
             developer_file_name = f"{developer_name}_developer_effort.csv"
-            output_file_path = os.path.join(os.path.dirname(output_csv), developer_file_name)
+            output_file_path = os.path.join(output_dir, developer_file_name)
 
             with open(output_file_path, "a", newline="") as csvfile:
                 writer = csv.writer(csvfile)
 
                 if os.path.getsize(output_file_path) == 0:
                     writer.writerow(["refactoring hash", "previous hash", "TLOC"])
-            
+
                 #for commit_hash in refactoring_hashes:
                 if commit_hash not in processed_hashes:
-                   # continue
+                    # continue
                     processed_hashes.add(commit_hash)
-            
+
                     if not commit.parents:
                         print(f"Skipping commit {commit_hash} (no parents found)")
                         continue
@@ -83,12 +83,11 @@ def collect_developer_effort(repo_path: str, output_csv: str, refactoring_hashes
 
                     writer.writerow([commit_hash, previous_commit_hash, tloc])
                     print(f"TLOC for {commit_hash} (compared to {previous_commit_hash}): {tloc}")
-            
 
-       
-def mine_repo(directory:str):
+
+def mine_repo(repo_dir:str, output_dir:str):
     client = docker.from_env()
-    dir_real_path = os.path.realpath(directory)
+    dir_real_path = os.path.realpath(repo_dir)
     miner = client.containers.create("tsantalis/refactoringminer",
         "-a /repo -json " + MINER_OUTPUT_FILE,
         volumes={
@@ -110,6 +109,9 @@ def mine_repo(directory:str):
     output_tar.close()
     json_obj = json.loads(output_json)
 
+    with open(os.path.join(output_dir, "rminer-output.json"), "w") as rminer_file:
+        json.dump(json_obj, rminer_file)
+
     #Count different commit types to a directory. Also calculate time between commits average
     refactorings = {}
     previous_refactor_date = None
@@ -121,6 +123,7 @@ def mine_repo(directory:str):
         if len(commit["refactorings"]) > 0:
             commit_hash = commit["sha1"]
             refactoring_hashes.append(commit_hash)
+
         for refactoring in commit["refactorings"]:
             commit_date = get_commit_date(directory, commit_hash)
             if previous_refactor_date:
@@ -132,20 +135,24 @@ def mine_repo(directory:str):
             type = refactoring["type"]
             refactorings[type] = refactorings.get(type, 0) + 1 #Increment count for refactoring type
 
-    # TODO: save to file
-    diffs = collect_diffs(dir_real_path, refactoring_hashes)
-
-    collect_developer_effort(directory, "developer_effort.csv", refactoring_hashes)
-
+    time_between_refactors = 0
     if len(refactorings) > 0: #Print output for now, get prettier output in the future
-        print("Refactor types for " + directory)
-        print(refactorings)
-        print("Average time between refactors:", refactor_date_difference_sum / refactor_count)
-    else:
-        print("No refactorings for repository " + directory)
-        
-    p = subprocess.Popen(["rm", TAR_FILE]) # Remove tarfile
-    p.wait(5)
+        time_between_refactors = refactor_date_difference_sum / refactor_count
+
+    with open(os.path.join(output_dir, "refactorings.json"), "w") as refactorings_file:
+        output = {
+            "refactorings": refactorings,
+            "average_time_between_refactors": str(time_between_refactors)
+        }
+        json.dump(output, refactorings_file)
+
+    diffs = collect_diffs(dir_real_path, refactoring_hashes)
+    with open(os.path.join(output_dir, "diffs.json"), "w") as diffs_file:
+        json.dump(diffs, diffs_file)
+
+    collect_developer_effort(repo_dir, output_dir, refactoring_hashes)
+
+    os.remove(TAR_FILE)
 
 
 def collect_diffs(path, hashes):
@@ -179,13 +186,18 @@ def get_commit_date(git_dir: str, hash: str) -> datetime:
 
 def main():
     urls = urlparser.list_project_urls("./sonar_measures.csv")
-    output_csv = "developer_effort.csv"
 
     for url in urls:
         try:
-           with Repository(url) as dir_name:
-                mine_repo(dir_name)
-                issues.mine_issue_data(url)
+           with Repository(url) as (dir_name, repo_name):
+                current_dir = os.path.dirname(__file__)
+                output_dir = os.path.join(current_dir, "output", repo_name)
+
+                print(f"OUTPUT DIRECTORY: {output_dir}")
+                os.makedirs(output_dir)
+
+                mine_repo(dir_name, output_dir)
+                issues.mine_issue_data(url, output_dir)
         except Exception as e:
             print(e)
         input("Mined a repository, newline to continue") #Input to reduce spam, remove when not needed
