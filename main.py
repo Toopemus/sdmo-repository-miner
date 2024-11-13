@@ -92,11 +92,13 @@ def mine_repo(repo_dir:str, output_dir:str):
         "-a /repo -json " + MINER_OUTPUT_FILE,
         volumes={
             dir_real_path: {"bind": "/repo", "mode": "rw"}
-        }
+        },
+        detach=True
     )
     miner.start()
     miner.wait()
     bits, stat = miner.get_archive("diff/" + MINER_OUTPUT_FILE) # Get output file from exited container as a tarfile
+    miner.remove()
 
     file = open(TAR_FILE, "wb") #Open file for writing output bits
     for chunk in bits:
