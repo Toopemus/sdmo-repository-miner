@@ -6,6 +6,7 @@ import tarfile
 import json
 import csv
 import issues
+import sys
 
 from datetime import datetime, timedelta
 from repository import Repository
@@ -84,34 +85,47 @@ def collect_developer_effort(repo_path: str, output_dir: str, refactoring_hashes
 
                     writer.writerow([commit_hash, previous_commit_hash, tloc])
 
-def mine_repo(repo_dir:str, output_dir:str):
+def mine_repo(repo_dir:str, output_dir:str, miner_path:str):
     print(f"{current_time()} - Running RefactoringMiner...")
-    client = docker.from_env()
     dir_real_path = os.path.realpath(repo_dir)
-    miner = client.containers.create("tsantalis/refactoringminer",
-        "-a /repo -json " + MINER_OUTPUT_FILE,
-        volumes={
-            dir_real_path: {"bind": "/repo", "mode": "rw"}
-        },
-        detach=True
-    )
-    miner.start()
-    miner.wait()
-    bits, stat = miner.get_archive("diff/" + MINER_OUTPUT_FILE) # Get output file from exited container as a tarfile
-    miner.remove()
+    if not miner_path:
+        client = docker.from_env()
+        miner = client.containers.create("tsantalis/refactoringminer",
+            "-a /repo -json " + MINER_OUTPUT_FILE,
+            volumes={
+                dir_real_path: {"bind": "/repo", "mode": "rw"}
+            },
+            detach=True
+        )
+        miner.start()
+        miner.wait()
+        bits, stat = miner.get_archive("diff/" + MINER_OUTPUT_FILE) # Get output file from exited container as a tarfile
+        miner.remove()
 
-    file = open(TAR_FILE, "wb") #Open file for writing output bits
-    for chunk in bits:
-        file.write(chunk)
-    file.close()
+        file = open(TAR_FILE, "wb") #Open file for writing output bits
+        for chunk in bits:
+            file.write(chunk)
+        file.close()
 
-    output_tar = tarfile.open(TAR_FILE, "r") #Extract json object from tarfile
-    output_json = output_tar.extractfile(MINER_OUTPUT_FILE).read()
-    output_tar.close()
-    json_obj = json.loads(output_json)
+        output_tar = tarfile.open(TAR_FILE, "r") #Extract json object from tarfile
+        output_json = output_tar.extractfile(MINER_OUTPUT_FILE).read()
+        output_tar.close()
+        json_obj = json.loads(output_json)
 
-    with open(os.path.join(output_dir, "rminer-output.json"), "w") as rminer_file:
-        json.dump(json_obj, rminer_file)
+        with open(os.path.join(output_dir, "rminer-output.json"), "w") as rminer_file:
+            json.dump(json_obj, rminer_file)
+
+        os.remove(TAR_FILE)
+
+    else:
+        subprocess.call(
+            [miner_path, "-a", dir_real_path, "-json", os.path.join(os.path.realpath(output_dir), "rminer-output.json")],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT
+        )
+
+        with open(os.path.join(os.path.realpath(output_dir), "rminer-output.json"), "r") as rminer_file:
+            json_obj = json.loads(rminer_file.read())
 
     print(f"{current_time()} - Parsing output from RefactoringMiner...")
     #Count different commit types to a directory. Also calculate time between commits average
@@ -156,7 +170,6 @@ def mine_repo(repo_dir:str, output_dir:str):
     print(f"{current_time()} - Collecting developer effort...")
     collect_developer_effort(repo_dir, output_dir, refactoring_hashes)
 
-    os.remove(TAR_FILE)
 
 def collect_diffs(path, hashes):
     out = []
@@ -189,7 +202,11 @@ def get_commit_date(git_dir: str, hash: str) -> datetime:
 
 def main():
     urls = urlparser.list_project_urls("./sonar_measures.csv")
-
+    if len(sys.argv) > 1:
+        refactoringMinerPath = sys.argv[1]
+    else:
+        refactoringMinerPath = None
+    
     for url in urls:
         try:
            with Repository(url) as (dir_name, repo_name):
@@ -201,7 +218,7 @@ def main():
                 os.makedirs(output_dir)
 
                 print(f"Mining the {repo_name} repository...")
-                mine_repo(dir_name, output_dir)
+                mine_repo(dir_name, output_dir, refactoringMinerPath)
 
                 print(f"{current_time()} - Mining issue data...")
                 issues.mine_issue_data(url, output_dir)
