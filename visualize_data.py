@@ -6,7 +6,7 @@ from datetime import timedelta, datetime
 
 OUTPUT_ROOT_DIR = "./output"
 REFACTORING_FILE = "refactorings.json"
-PROGRAM_LOG_FILE = "../program_backup.txt"
+PROGRAM_LOG_FILE = "./program_output.txt"
 LINE_TIME_PREFIX_RE = "(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+) - "
 
 LOG_REGEX_SEQUENCE = [
@@ -18,6 +18,19 @@ LOG_REGEX_SEQUENCE = [
     r"Success!",
 ]
 
+def get_time_from_str(time_str):
+    match = re.search(
+        r"(?:(?P<days>\d+) day[s]?, )?(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+)(?:.(?P<milliseconds>\d+))?",
+        time_str
+    )
+    days = int(match.group("days")) if match.group("days") else 0
+    return timedelta(
+        days=days,
+        hours=int(match.group("hours")),
+        minutes=int(match.group("minutes")),
+        seconds=int(match.group("minutes"))
+    )
+
 
 def estimate_mining_time_division():
     """
@@ -27,12 +40,17 @@ def estimate_mining_time_division():
     """
     step_time_sum = [timedelta() for i in range(0, 5)] #Indices are diffrent steps in the mining process
     total_time = timedelta()
+    time_per_project = {}
 
     with open(PROGRAM_LOG_FILE, "r") as log_file:
+        current_project_name = None
         log_sequence_index = 0
         time_for_step = None
         previous_time = None
         for line in log_file.readlines():
+            if project_name := re.search("Mining the (.*) repository...", line):
+                current_project_name = project_name.group(1)
+
             if re_match := re.search(
                 LINE_TIME_PREFIX_RE + LOG_REGEX_SEQUENCE[log_sequence_index], line
             ):
@@ -44,6 +62,7 @@ def estimate_mining_time_division():
                         action_time = action_time = datetime(1, 1, 2, int(re_match['hours']), int(re_match["minutes"]), int(re_match["seconds"]))
                         time_for_step = action_time - previous_time
 
+                    time_per_project[current_project_name] = time_per_project.get(current_project_name, timedelta()) + time_for_step
                     total_time += time_for_step
                     step_time_sum[log_sequence_index - 1] += time_for_step
                 
@@ -85,6 +104,28 @@ def estimate_mining_time_division():
     ax.pie([i.total_seconds() for i in step_time_sum], labels=labels)
     plt.show()
 
+    time_for_refactor = []
+    for key, value in time_per_project.items():
+        try:
+            with open(f"{OUTPUT_ROOT_DIR}/{key}/{REFACTORING_FILE}", "r") as refactoring_file:
+                sum = 0
+                json_obj = json.loads(refactoring_file.read())
+                refactorings = json_obj['refactorings']
+                for val in refactorings.values():
+                    sum += val
+                
+                time_for_refactor.append((sum, value.total_seconds()))
+
+
+        except Exception as e:
+            print(e)
+        
+    ax = plt.subplot()
+    ax.scatter(*zip(*time_for_refactor))
+    plt.xlabel("Number of refactorings")
+    plt.ylabel("Total mining time in seconds")
+    plt.show()
+
 
 
 def draw_and_save_inter_commit_time_histogram():
@@ -95,17 +136,7 @@ def draw_and_save_inter_commit_time_histogram():
             with open(f"{OUTPUT_ROOT_DIR}/{dir}/{REFACTORING_FILE}", "r") as refactoring_file:
                 json_obj = json.loads(refactoring_file.read())
                 average_refactor_time = json_obj['average_time_between_refactors']
-                match = re.search(
-                    r"(?:(?P<days>\d+) day[s]?, )?(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+)(?:.(?P<milliseconds>\d+))?",
-                    average_refactor_time
-                )
-                days = int(match.group("days")) if match.group("days") else 0
-                time = timedelta(
-                    days=days,
-                    hours=int(match.group("hours")),
-                    minutes=int(match.group("minutes")),
-                    seconds=int(match.group("minutes"))
-                )
+                time = get_time_from_str(average_refactor_time)
 
                 average_times.append((time.total_seconds() / 60) / 60)
         except Exception as e:
@@ -128,7 +159,7 @@ def draw_and_save_inter_commit_time_histogram():
 
 
 def main():
-    draw_and_save_inter_commit_time_histogram()
+    #draw_and_save_inter_commit_time_histogram()
     estimate_mining_time_division()
 
 
