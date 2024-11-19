@@ -20,19 +20,19 @@ def to_url(project):
     Parses a project name into a clonable GitHub URL under the Apache organization.
 
     >>> to_url('test-repository')
-    'https://github.com/apache/test-repository.git'
+    'https://github.com/apache/test-repository'
 
     Also removes the organization name that is prepended to some of the names:
     >>> to_url('apache_test-repository')
-    'https://github.com/apache/test-repository.git'
+    'https://github.com/apache/test-repository'
 
     >>> to_url('apache-test-repository')
-    'https://github.com/apache/test-repository.git'
+    'https://github.com/apache/test-repository'
     """
     if project.startswith("apache_") or project.startswith("apache-"):
         project = project[len("apache_"):]
 
-    return f"https://github.com/apache/{project}.git"
+    return f"https://github.com/apache/{project}"
 
 if __name__ == "__main__":
     import doctest
