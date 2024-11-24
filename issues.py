@@ -58,19 +58,36 @@ def fetch_github_issues(owner, repo):
     return issues
 
 # Get the JIRA data
-def fetch_jira_data(project_key):
+def fetch_jira_issues(project_key):
     """
     Gets the jira issues from repository.
     >>> issues = fetch_jira_data('GEOMETRY')
     >>> len(issues) != 0
     True
     """
-    response = requests.get(f"{APACHE_JIRA_API_URL}/search?jql=project={project_key}")
+    issues = []
 
-    if response.status_code == 200:
-        return response.json()
-    print(f"{current_time()} - Failed to retrieve JIRA data: {response.status_code} - {response.text}")
-    return {}
+    response = requests.get(f"{APACHE_JIRA_API_URL}/search?jql=project={project_key}&maxResults=100")
+    body = response.json()
+    total = body["total"]
+
+    issues.extend(body["issues"])
+
+    issues_start_index = 100
+    while issues_start_index < total:
+        print(f"Querying for issues {issues_start_index}-{issues_start_index + 100} out of {total}")
+        response = requests.get(f"{APACHE_JIRA_API_URL}/search?jql=project={project_key}&startAt={issues_start_index}&maxResults=100")
+
+        if response.status_code != 200:
+            print(f"{current_time()} - Failed to retrieve JIRA data: {response.status_code} - {response.text}")
+
+        body = response.json()
+
+        issues.extend(body["issues"])
+
+        issues_start_index += 100
+
+    return issues
 
 # Find JIRA project key
 def find_jira_project_key(repo, jira_projects):
@@ -105,6 +122,11 @@ def parse_github_repo(url):
     parts = url.split('/')
     return parts[-2], parts[-1]
 
+# We store project keys that have already been crawled through to avoid going
+# through the same issues multiple times. This applies to projects like SLING,
+# which has multiple repos but a single issue tracker.
+already_fetched = []
+
 def mine_issue_data(url, output_dir):
     # GitHub repository processing
     owner, repo = parse_github_repo(url)
@@ -116,13 +138,14 @@ def mine_issue_data(url, output_dir):
     elif find_jira_project_key(repo, jira_projects):
         # JIRA project processing
         project_key = find_jira_project_key(repo, jira_projects)
-        if project_key:
-            issues = fetch_jira_data(project_key).get("issues", [])
+        if project_key and project_key not in already_fetched:
+            issues = fetch_jira_issues(project_key)
             print(f"{current_time()} - Retrieved {len(issues)} issues for JIRA project {project_key}")
             with open(os.path.join(output_dir, f"{project_key}_jira_issues.json"), "w") as issue_file:
                 json.dump(issues, issue_file)
+            already_fetched.append(project_key)
         else:
-            print(f"{current_time()} - No JIRA project found for URL: {url}")
+            print(f"{current_time()} - JIRA issues already mined for: {url}")
     else:
         print(f"{current_time()} - Issues are not enabled for {owner}/{repo}")
 
